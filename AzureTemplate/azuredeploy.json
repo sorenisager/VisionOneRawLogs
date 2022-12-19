@@ -21,7 +21,7 @@
         "VisionOneAPIKey": {
             "type": "string",
             "metadata": {
-                "description": "description"
+                "description": "Provide the Vision One User API key"
             }
         },
         "VisionOneRegion": {
@@ -36,7 +36,7 @@
                 "api.au.xdr.trendmicro.com"
             ],
             "metadata": {
-                "description": "Select the Tenant Vision One region. https://automation.trendmicro.com/xdr/Guides/Regional-Domains"
+                "description": "Select the Tenant Vision One region. See more: https://automation.trendmicro.com/xdr/Guides/Regional-Domains"
             }
         }
     },
@@ -110,7 +110,7 @@
             "apiVersion": "2018-02-01",
             "location": "[resourceGroup().location]",
             "sku": {
-                "name": "F1",
+                "name": "B1",
                 "capacity": 1
             },
             "properties": {
