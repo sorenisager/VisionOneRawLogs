@@ -4,15 +4,8 @@
     "parameters": {
         "tenantId": {
             "type": "string",
-            "defaultValue": "[subscription().tenantId]",
             "metadata": {
                 "description": "Tenant ID"
-            }
-        },
-        "location": {
-            "type": "string",
-            "metadata": {
-                "description": "description"
             }
         },
         "StorageRedundancy": {
@@ -102,7 +95,7 @@
             "type": "Microsoft.Storage/storageAccounts",
             "name": "[variables('storageAccountName')]",
             "apiVersion": "2019-06-01",
-            "location": "[parameters('location')]",
+            "location": "[resourceGroup().location]",
             "kind": "StorageV2",
             "sku": {
                 "name": "[parameters('StorageRedundancy')]"
