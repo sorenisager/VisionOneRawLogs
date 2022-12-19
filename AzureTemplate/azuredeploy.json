@@ -1,0 +1,179 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tenantId": {
+            "type": "string",
+            "defaultValue": "[subscription().tenantId]",
+            "metadata": {
+                "description": "Tenant ID"
+            }
+        },
+        "location": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        "StorageRedundancy": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS"
+            ],
+            "metadata": {
+                "description": "Select which Storage Redundancy you need (Keeps track of Log ingestion)"
+            }
+        },
+        "VisionOneAPIKey": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        "VisionOneRegion": {
+            "type": "string",
+            "defaultValue": "api.xdr.trendmicro.com",
+            "allowedValues": [
+                "api.xdr.trendmicro.com",
+                "api.sg.xdr.trendmicro.com",
+                "api.xdr.trendmicro.co.jp",
+                "api.in.xdr.trendmicro.com",
+                "api.eu.xdr.trendmicro.com",
+                "api.au.xdr.trendmicro.com"
+            ],
+            "metadata": {
+                "description": "Select the Tenant Vision One region. https://automation.trendmicro.com/xdr/Guides/Regional-Domains"
+            }
+        }
+    },
+    "functions": [],
+    "variables": {
+        "DataHandlerFunction": "[concat(uniquestring(resourceGroup().id), 'dhf')]",
+        "storageAccountName": "[concat(uniquestring(resourceGroup().id), 'stg')]",
+        "AppServiceName": "[concat(uniquestring(resourceGroup().id), 'appservice')]",
+        "KeyvaultName": "[concat(uniquestring(resourceGroup().id), 'kv')]",
+        "storageAccountid": "[resourceId('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]",
+        "functionWorkerRuntime": "powershell"
+    },
+    "resources": [
+        {
+            "name": "[variables('KeyvaultName')]",
+            "type": "Microsoft.KeyVault/vaults",
+            "apiVersion": "2016-10-01",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "enabledForDeployment": true,
+                "enabledForTemplateDeployment": true,
+                "enabledForDiskEncryption": true,
+                "tenantId": "[parameters('tenantId')]",
+                "accessPolicies": [],
+                "sku": {
+                    "name": "standard",
+                    "family": "A"
+                }
+            },
+            "resources": [
+                {
+                    "type": "secrets",
+                    "name": "VisionOneRegion",
+                    "apiVersion": "2016-10-01",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.KeyVault/vaults', variables('KeyvaultName'))]"
+                    ],
+                    "properties": {
+                        "value": "[parameters('VisionOneRegion')]"
+                    }
+                },
+                {
+                    "type": "secrets",
+                    "name": "VisionOneAPIKey",
+                    "apiVersion": "2016-10-01",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.KeyVault/vaults', variables('KeyvaultName'))]"
+                    ],
+                    "properties": {
+                        "value": "[parameters('VisionOneAPIKey')]"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('storageAccountName')]",
+            "apiVersion": "2019-06-01",
+            "location": "[parameters('location')]",
+            "kind": "StorageV2",
+            "sku": {
+                "name": "[parameters('StorageRedundancy')]"
+            },
+            "properties": {
+                "supportsHttpsTrafficOnly": true
+            }
+        },
+        {
+            "name": "[variables('AppServiceName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "F1",
+                "capacity": 1
+            },
+            "properties": {
+                "name": "[variables('AppServiceName')]",
+                "computeMode": "Dynamic"
+            }
+        },
+        {
+            "name": "[variables('DataHandlerFunction')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "location": "[resourceGroup().location]",
+            "kind": "functionapp",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('AppServiceName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('StorageAccountName'))]"
+            ],
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('AppServiceName'))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                    "minTlsVersion": "1.2",
+                    "ftpAccess": "off",
+                    "appSettings": [
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountName'), ';AccountKey=', listKeys(variables('storageAccountid'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountName'), ';AccountKey=', listKeys(variables('storageAccountid'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "WEBSITE_CONTENTSHARE",
+                            "value": "[toLower(variables('DataHandlerFunction'))]"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~4"
+                        },
+                        {
+                            "name": "TenantID",
+                            "value": "[parameters('tenantId')]"
+                        },
+                        {
+                            "name": "WEBSITE_RUN_FROM_PACKAGE",
+                            "value": "1"
+                        },
+                        {
+                            "name": "FUNCTIONS_WORKER_RUNTIME",
+                            "value": "[variables('functionWorkerRuntime')]"
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "outputs": {}
+}
